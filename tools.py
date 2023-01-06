@@ -1,40 +1,61 @@
 import os
+import requests
 import pandas as pd
 from eod import EodHistoricalData
 
 # Ticker symbols of companies in the US need to be followed by .US : "AAPL" -> "AAPL.US"
 
-# an Excel file (.xlsx) of a stock market index with the ticker symbols of the constituents including their industries (GICS Sector) is required
-# The list has to be in a similar format as the list given in the folder "resources"
-constituents_list = "./resources/s&p600.xlsx"
-
 key = os.environ["API_EOD"]  # gathering the API-Key for EODhistoricaldata, stored in an environment variable
 client = EodHistoricalData(key)  # setting up the client for downloading the fundamental data
 
 
-def get_competitors(symbol: str, industry):
+def get_market(symbol: str, exchange: str):
     """
-    Gathers all the ticker symbols of its competitors in a list - competitors: defined as other companies part of the same industry
-
-    :param symbol: The ticker symbol for the stock of interest as a string
-    :param industry: The corresponding industry according to the stock market index given 
+    Returns a list of all stock symbols within the same industry of a given exchange
+    :param symbol: requires one
+    single ticker symbol as a string
+    :param exchange: requires the symbol of an exchange for example "NASDAQ" or "NYSE". Here is
+    a full list of all exchanges available: https://eodhistoricaldata.com/financial-apis/list-supported-exchanges/
+    :return: list
     """
+    market_symbols = []
+    us_exchange = False
 
-    df = pd.read_excel(constituents_list)  # importing the list of constituents of the stock market index
-    industries = df.set_index("GICS Sector")
+    if ".US" in symbol:
+        symbol = symbol.replace(".US", "")
+        us_exchange = True
 
-    # filtering the industries DataFrame by the relevant industry and creating a list of symbols
-    competitors = industries.loc[industry]["Ticker symbol"].to_list()
+    initial_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}&'
+                                f'filters=['
+                                f'["exchange","=","{exchange}"],'
+                                f'["code","=","{symbol}"]'
+                                f']&limit=500&offset=0')
 
-    return competitors
+    stock_industry = initial_resp.json()["data"][0]["industry"]
+
+    market_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}'
+                               f'&filters=['
+                               f'["industry","=","{stock_industry}"],'
+                               f'["exchange","=","NASDAQ"]]&limit=500&offset=0')
+
+    for i in market_resp.json()["data"]:
+        if us_exchange:
+            market_symbols.append(i["code"] + ".US")
+        else:
+            market_symbols.append(i["code"])
+
+    market_symbols.remove(symbol)
+
+    return market_symbols
 
 
-def get_statement(element, statement_type = "Balance_Sheet"):
+def get_statement(element, statement_type="Balance_Sheet"):
     """
     Returns all recorded historical statements depending on the statement type and the ticker symbol as a DataFrame
 
-    :param element: One ticker symbol or a list of ticker symbols
-    :param statement_type: Optional parameter. Possible input: Balance_Sheet, Income_Statement, Cash_Flow
+    :param element: requires one ticker symbol or a list of ticker symbols
+    :param statement_type: optional parameter. Possible input: Balance_Sheet, Income_Statement, Cash_Flow
+    :return: DataFrame
     """
 
     resp = []
@@ -48,7 +69,7 @@ def get_statement(element, statement_type = "Balance_Sheet"):
         series = client.get_fundamental_equity(element)
         resp.append(series)
 
-    # filtering the dataset - quartely was chosen, as the annual frequency is included
+    # filtering the dataset - quarterly was chosen, as the annual frequency is included
     data = pd.DataFrame(
         pd.DataFrame(resp)["Financials"]
         .iloc[0][statement_type]["quarterly"]
@@ -57,11 +78,12 @@ def get_statement(element, statement_type = "Balance_Sheet"):
     return data
 
 
-def get_highlights(element: str):
+def get_highlights(element):
     """
     Returns the fundamentals section "Highlights" of EODhistoricaldata as a DataFrame for every stock/stocks given
 
-    :param element: One ticker symbol or a list of ticker symbols
+    :param element: requires one ticker symbol or a list of ticker symbols
+    :return: DataFrame
     """
 
     resp = []
@@ -89,7 +111,8 @@ def market_overview(elements: list):
 
     https://eodhistoricaldata.com/financial-apis/stock-etfs-fundamental-data-feeds/#Equities_Fundamentals_Data_API
 
-    :param elements: Must be a list containing one or more stock tickers that should be compared
+    :param elements: must be a list containing one or more stock tickers that should be compared
+    :return: DataFrame
     """
     kpis = {}
     for element in elements:
@@ -124,7 +147,10 @@ def get_average(equity: str, market):  # Builds upon the market_overview functio
     df1 = get_average("BCOR.US",df)  # Comparing the stock and the average of its market according to our stock market index
 
     :param equity: Ticker symbol of the stock that ought to be compared
-    :param market: DataFrame created by the market_overview function with symbols of the competitors you want to derive an avarage of - Including the symbol of the stock you want to compare to its market
+    :param market: DataFrame created by the
+    market_overview function with symbols of the competitors you want to derive an avarage of - Including the symbol
+    of the stock you want to compare to its market
+    :return: DataFrame
     """
 
     index = market.index
