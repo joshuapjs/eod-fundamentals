@@ -9,7 +9,7 @@ key = os.environ["API_EOD"]  # gathering the API-Key for EODhistoricaldata, stor
 client = EodHistoricalData(key)  # setting up the client for downloading the fundamental data
 
 
-def get_market(symbol: str, exchange: str):
+def get_group(symbol: str, exchange: str):
     """
     Returns a list of all stock symbols within the same industry of a given exchange
     :param symbol: requires one
@@ -18,7 +18,7 @@ def get_market(symbol: str, exchange: str):
     a full list of all exchanges available: https://eodhistoricaldata.com/financial-apis/list-supported-exchanges/
     :return: list
     """
-    market_symbols = []
+    group_symbols = []
     us_exchange = False
 
     if ".US" in symbol:
@@ -40,13 +40,13 @@ def get_market(symbol: str, exchange: str):
 
     for i in market_resp.json()["data"]:
         if us_exchange:
-            market_symbols.append(i["code"] + ".US")
+            group_symbols.append(i["code"] + ".US")
         else:
-            market_symbols.append(i["code"])
+            group_symbols.append(i["code"])
 
-    market_symbols.remove(symbol)
+    group_symbols.remove(symbol)
 
-    return market_symbols
+    return group_symbols
 
 
 def get_statement(element, statement_type="Balance_Sheet"):
@@ -104,7 +104,7 @@ def get_highlights(element):
     return data
 
 
-def market_overview(elements: list):
+def group_overview(elements: list):
     """
     Provides an overview about different KPIs for all stock tickers given as a list
     The highlights can be adjusted, or a list of the highlights visit:
@@ -125,13 +125,13 @@ def market_overview(elements: list):
             highlights["ReturnOnAssetsTTM"].iloc[0],
             highlights["QuarterlyRevenueGrowthYOY"].iloc[0],
             highlights["QuarterlyEarningsGrowthYOY"].iloc[0]]
-    df = pd.DataFrame(kpis, index=["EarningsShare",
-                                   "EPSEstimateCurrentYear",
-                                   "ProfitMargin",
-                                   "OperatingMarginTTM",
-                                   "ReturnOnAssetsTTM",
-                                   "QuarterlyRevenueGrowthYOY",
-                                   "QuarterlyEarningsGrowthYOY"])
+    df = pd.DataFrame(kpis, index=["EPS",
+                                   "EPS (current year)",
+                                   "Profit margin",
+                                   "Operating margin (trailing 12-month)",
+                                   "ROA (trailing 12-month)",
+                                   "Quarterly revenue growth (YoY)",
+                                   "Quarterly earnings growth (YoY)"])
 
     return df
 
@@ -161,12 +161,12 @@ def get_average(equity: str, market):  # Builds upon the market_overview functio
         market_average.append(average)
     data[str(equity)] = market[equity]
     data["Market"] = market_average
-    df = pd.DataFrame(data, index=["EarningsShare",
-                                   "EPSEstimateCurrentYear",
-                                   "ProfitMargin",
-                                   "OperatingMarginTTM",
-                                   "ReturnOnAssetsTTM",
-                                   "QuarterlyRevenueGrowthYOY",
-                                   "QuarterlyEarningsGrowthYOY"])
+    df = pd.DataFrame(data, index=["EPS",
+                                   "EPS (current year)",
+                                   "Profit margin",
+                                   "Operating margin (Trailing 12-month)",
+                                   "ROA (Trailing 12-month)",
+                                   "Quarterly revenue growth (YoY)",
+                                   "Quarterly earnings growth (YoY)"])
 
     return df
