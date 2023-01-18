@@ -11,12 +11,11 @@ client = EodHistoricalData(key)  # setting up the client for downloading the fun
 
 def get_group(symbol: str, exchange: str):
     """
-    Returns a list of all stock symbols within the same industry of a given exchange
     :param symbol: requires one
     single ticker symbol as a string
-    :param exchange: requires the symbol of an exchange for example "NASDAQ" or "NYSE". Here is
-    a full list of all exchanges available: https://eodhistoricaldata.com/financial-apis/list-supported-exchanges/
-    :return: list
+    :param exchange: requires the symbol of the exchange where the stock ist listed for example "NASDAQ" or "NYSE".
+    Here is a full list of all exchanges available: https://eodhistoricaldata.com/financial-apis/list-supported-exchanges/
+    :return: list of all stock symbols within the same industry of a given exchange - including the stock given
     """
     group_symbols = []
     us_exchange = False
@@ -44,23 +43,19 @@ def get_group(symbol: str, exchange: str):
         else:
             group_symbols.append(i["code"])
 
-    group_symbols.remove(symbol)
-
     return group_symbols
 
 
 def get_statement(element, statement_type="Balance_Sheet"):
     """
-    Returns all recorded historical statements depending on the statement type and the ticker symbol as a DataFrame
-
     :param element: requires one ticker symbol or a list of ticker symbols
     :param statement_type: optional parameter. Possible input: Balance_Sheet, Income_Statement, Cash_Flow
-    :return: DataFrame
+    :return: DataFrame of all recorded historical statements depending on the statement type and the ticker symbol
     """
 
     resp = []
 
-    # downloading multiple datasets if a list of symbols is given or one if only one symbol is given
+    # downloading multiple datasets if a list of symbols is given or one dataset if only one symbol is given
     if isinstance(element, list):
         for i in element:
             series = client.get_fundamental_equity(i)
@@ -69,7 +64,7 @@ def get_statement(element, statement_type="Balance_Sheet"):
         series = client.get_fundamental_equity(element)
         resp.append(series)
 
-    # filtering the dataset - quarterly was chosen, as the annual frequency is included
+    # filtering the dataset
     data = pd.DataFrame(
         pd.DataFrame(resp)["Financials"]
         .iloc[0][statement_type]["quarterly"]
@@ -80,10 +75,8 @@ def get_statement(element, statement_type="Balance_Sheet"):
 
 def get_highlights(element):
     """
-    Returns the fundamentals section "Highlights" of EODhistoricaldata as a DataFrame for every stock/stocks given
-
     :param element: requires one ticker symbol or a list of ticker symbols
-    :return: DataFrame
+    :return: DataFrame of the fundamental "Highlights" via EODhistoricaldata as a DataFrame for every stock given
     """
 
     resp = []
@@ -106,13 +99,12 @@ def get_highlights(element):
 
 def group_overview(elements: list):
     """
-    Provides an overview about different KPIs for all stock tickers given as a list
-    The highlights can be adjusted, or a list of the highlights visit:
+    The highlights can be adjusted for a list of the highlights visit:
 
     https://eodhistoricaldata.com/financial-apis/stock-etfs-fundamental-data-feeds/#Equities_Fundamentals_Data_API
 
-    :param elements: must be a list containing one or more stock tickers that should be compared
-    :return: DataFrame
+    :param elements: must be a list containing one or more stock ticker
+    :return: DataFrame providing an overview about different KPIs for all stock tickers given as "elements"
     """
     kpis = {}
     for element in elements:
@@ -136,31 +128,28 @@ def group_overview(elements: list):
     return df
 
 
-def get_average(equity: str, market):  # Builds upon the market_overview function
+def compare(equity: str, group):  # Builds on the group_overview function
     """
-    returns a DataFrame containing different KPIs of one stock and the average of its market given as a separate list
-    The market of the stock has to be provided manually as a list
-
     Example:
 
-    df = market_overview(["BCOR.US", "BSIG.US", "RILY.US", "VRTS.US", "WETF.US"])  # Creating the DataFrame of a market
-    df1 = get_average("BCOR.US",df)  # Comparing the stock and the average of its market according to our stock market index
+    df = group_overview(["BCOR.US", "BSIG.US", "RILY.US", "VRTS.US", "WETF.US"])  # Creating the DataFrame of a group
+    df1 = compare("BCOR.US",df)  # Comparing KPIs of the stock with the averages of its group
 
     :param equity: Ticker symbol of the stock that ought to be compared
-    :param market: DataFrame created by the
-    market_overview function with symbols of the competitors you want to derive an avarage of - Including the symbol
+    :param group: DataFrame created by the
+    group_overview function with symbols of the competitors you want to derive an avarage of - Including the symbol
     of the stock you want to compare to its market
-    :return: DataFrame
+    :return: DataFrame containing different KPIs of one stock and the average of its group given as a separate list
     """
 
-    index = market.index
+    index = group.index
     data = {}
-    market_average = []
+    averages = []
     for row in index:
-        average = market.loc[row].mean()
-        market_average.append(average)
-    data[str(equity)] = market[equity]
-    data["Market"] = market_average
+        average = group.loc[row].mean()
+        averages.append(average)
+    data[str(equity)] = group[equity]
+    data["Market"] = averages
     df = pd.DataFrame(data, index=["EPS",
                                    "EPS (current year)",
                                    "Profit margin",
