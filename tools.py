@@ -9,39 +9,59 @@ key = os.environ["API_EOD"]  # gathering the API-Key for EODhistoricaldata, stor
 client = EodHistoricalData(key)  # setting up the client for downloading the fundamental data
 
 
-def get_group(symbol: str, exchange: str):
+def get_group(symbol: str, name=None):
     """
-    :param symbol: requires one
-    single ticker symbol as a string
-    :param exchange: requires the symbol of the exchange where the stock ist listed for example "NASDAQ" or "NYSE".
-    Here is a full list of all exchanges available: https://eodhistoricaldata.com/financial-apis/list-supported-exchanges/
-    :return: list of all stock symbols within the same industry of a given exchange - including the stock given
+    :param symbol: requires one single ticker symbol as a string
+    :param name: additional optional parameter to filter the competitors list in order to avoid redundancies in case the
+    stock is listed under different symbols on more than one of the relevant exchanges
+    :return: list of all stock symbols within the same industry of the most relevant exchanges
     """
     group_symbols = []
-    us_exchange = False
+    tickers = []
+    relevant_exchanges = ['Xetra', 'US', 'LSE', 'HK', 'SHG']  # List of what I found to be the most relevant exchanges
 
     if ".US" in symbol:
         symbol = symbol.replace(".US", "")
-        us_exchange = True
 
-    initial_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}&'
-                                f'filters=['
-                                f'["exchange","=","{exchange}"],'
-                                f'["code","=","{symbol}"]'
-                                f']&limit=500&offset=0')
+    # Searching the stock symbol on the most relevant exchanges
+    for exchange in relevant_exchanges:
 
-    stock_industry = initial_resp.json()["data"][0]["industry"]
+        initial_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}&filters=['
+                                    f'["code","=","{symbol}"],'
+                                    f'["exchange","=","{exchange}"]'
+                                    f']&limit=500&offset=0')
 
-    market_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}'
-                               f'&filters=['
-                               f'["industry","=","{stock_industry}"],'
-                               f'["exchange","=","NASDAQ"]]&limit=500&offset=0')
+        if len(initial_resp.json()["data"]) > 0:
+            tickers.append(initial_resp.json()["data"][0])
 
-    for i in market_resp.json()["data"]:
-        if us_exchange:
-            group_symbols.append(i["code"] + ".US")
+    # Check if the stock is listed on several Exchanges with the same symbol
+    if len(tickers) > 1:
+        print("DANGER: Stock is listed on different exchanges... ")
+    stock_industry = tickers[0]["industry"]
+    tickers.clear()
+
+    # Searching for all the stocks within the same industry on all different exchanges
+    for exchange in relevant_exchanges:
+
+        market_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}&filters=['
+                                   f'["industry","=","{stock_industry}"],'
+                                   f'["exchange","=","{exchange}"]'
+                                   f']&limit=500&offset=0')
+
+        if len(market_resp.json()["data"]) > 0:
+            if len(market_resp.json()["data"]) > 1:
+                for element in market_resp.json()["data"]:
+                    tickers.append((element["code"], element["name"]))
+                tickers.append((market_resp.json()["data"][0]["code"], market_resp.json()["data"][0]["name"]))
+
+    # Check to avoid redundancy of the competitors
+    for i in tickers:
+        if i[0] in group_symbols:
+            pass
+        elif name is not None and name in i[1]:
+            pass
         else:
-            group_symbols.append(i["code"])
+            group_symbols.append(i[0])
 
     return group_symbols
 
