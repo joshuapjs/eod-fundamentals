@@ -112,7 +112,7 @@ def get_highlights(element):
     data = pd.DataFrame(
         pd.DataFrame(resp)["Highlights"].iloc[0],
         index=[0]
-    )
+    ).transpose()
 
     return data
 
