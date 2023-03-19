@@ -1,6 +1,8 @@
 import os
 import requests
+import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from eod import EodHistoricalData
 
 # Ticker symbols of companies in the US need to be followed by .US : "AAPL" -> "AAPL.US"
@@ -193,3 +195,22 @@ def compare(equity, group):  # Builds on the group_overview function
                                    "Quarterly earnings growth (YoY)"])
 
     return df
+
+
+def plot_position(statement_position, statement):
+    """
+    View the development of a statement position over time
+    :param statement_position: Value of the row in the statement you want to plot
+    :type statement_position: str
+    :param statement: statement from the get_statements function
+    :type statement: pd.DataFrame
+    """
+    statement.loc[statement_position].astype(float)[::-1]\
+        .plot(figsize=(10, 5), grid=True)\
+        .margins(x=0)
+    plt.title(statement_position)
+    plt.xlabel('Time')
+    plt.ylabel('Amount')
+    current_values = plt.gca().get_yticks()
+    plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
+    plt.show()
