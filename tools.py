@@ -9,11 +9,13 @@ key = os.environ["API_EOD"]  # gathering the API-Key for EODhistoricaldata, stor
 client = EodHistoricalData(key)  # setting up the client for downloading the fundamental data
 
 
-def get_group(symbol: str, name=None):
+def get_group(symbol, name=None):
     """
+    Access all relevant stocks within a certain industry, determined by the symbol given
     :param symbol: requires one single ticker symbol as a string
-    :param name: additional optional parameter to filter the competitors list in order to avoid redundancies in case the
-    stock is listed under different symbols on more than one of the relevant exchanges
+    :type symbol: str
+    :param name: filter the competitors list by the company's name to avoid redundancies  in case of multiple listing
+    :type name: str, optional
     :return: list of all stock symbols within the same industry of the most relevant exchanges
     """
     group_symbols = []
@@ -68,11 +70,12 @@ def get_group(symbol: str, name=None):
 
 def get_statement(element, statement_type="Balance_Sheet"):
     """
-    :param element: requires one ticker symbol or a list of ticker symbols
-    :param statement_type: optional parameter. Possible input: Balance_Sheet, Income_Statement, Cash_Flow
+    :param element: ticker symbol or multiple symbol of the company
+    :type element: str or list
+    :param statement_type: "Balance_Sheet" or "Income_Statement" or "Cash_Flow"
+    :type statement_type: str, optional
     :return: DataFrame of all recorded historical statements depending on the statement type and the ticker symbol
     """
-
     resp = []
 
     # downloading multiple datasets if a list of symbols is given or one dataset if only one symbol is given
@@ -95,10 +98,12 @@ def get_statement(element, statement_type="Balance_Sheet"):
 
 def get_highlights(element):
     """
-    :param element: requires one ticker symbol or a list of ticker symbols
+    Access to the highlights predefined and given by EODhistoricaldata
+
+    :param element: ticker symbol or multiple symbol of the company
+    :type element: str or list
     :return: DataFrame of the fundamental "Highlights" via EODhistoricaldata as a DataFrame for every stock given
     """
-
     resp = []
 
     if isinstance(element, list):
@@ -117,17 +122,24 @@ def get_highlights(element):
     return data
 
 
-def group_overview(elements: list):
+def group_overview(elements):
     """
     The highlights can be adjusted for a list of the highlights visit:
-
     https://eodhistoricaldata.com/financial-apis/stock-etfs-fundamental-data-feeds/#Equities_Fundamentals_Data_API
 
-    :param elements: must be a list containing one or more stock ticker
+    :param elements: ticker symbol or multiple symbol of the company
+    :type elements: str, list
     :return: DataFrame providing an overview about different KPIs for all stock tickers given as "elements"
     """
     kpis = {}
-    for element in elements:
+
+    if isinstance(elements, list):
+        formatted_elements = elements
+        pass
+    else:
+        formatted_elements = list(elements)
+
+    for element in formatted_elements:
         highlights = get_highlights(element)
         kpis[str(element)] = [
             highlights["EarningsShare"].iloc[0],
@@ -148,20 +160,22 @@ def group_overview(elements: list):
     return df
 
 
-def compare(equity: str, group):  # Builds on the group_overview function
+def compare(equity, group):  # Builds on the group_overview function
     """
-    Example:
+    Example::
 
-    df = group_overview(["BCOR.US", "BSIG.US", "RILY.US", "VRTS.US", "WETF.US"])  # Creating the DataFrame of a group
-    df1 = compare("BCOR.US",df)  # Comparing KPIs of the stock with the averages of its group
+        df = group_overview(["BCOR.US", "BSIG.US", "RILY.US", "VRTS.US", "WETF.US"])  # DataFrame of a group
+        df1 = compare("BCOR.US",df)  # Comparing KPIs of the stock with the averages of its group
 
     :param equity: Ticker symbol of the stock that ought to be compared
+    :type equity: str
     :param group: DataFrame created by the
     group_overview function with symbols of the competitors you want to derive an avarage of - Including the symbol
     of the stock you want to compare to its market
+    :type group: pd.DataFrame
+
     :return: DataFrame containing different KPIs of one stock and the average of its group given as a separate list
     """
-
     index = group.index
     data = {}
     averages = []
