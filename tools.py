@@ -100,26 +100,50 @@ def get_statement(element, statement_type="Balance_Sheet"):
 
 def get_highlights(element):
     """
-    Access to the highlights predefined and given by EODhistoricaldata
+    Access the fundamental highlights of a ticker given by EODhistoricaldata
 
     :param element: ticker symbol or multiple symbol of the company
     :type element: str or list
     :return: DataFrame of the fundamental "Highlights" via EODhistoricaldata as a DataFrame for every stock given
     """
     resp = []
+    multiple_resp = {}
+    num = 0
 
+    # Check if data is requested for several stocks all at once
     if isinstance(element, list):
         for i in element:
-            series = client.get_fundamental_equity(i)
-            resp.append(series)
+            # Excluding stocks where no fundamental data is provided
+            try:
+                series = client.get_fundamental_equity(i)
+            except:
+                continue  # Skipping the stock if there is not server response
+            if "Highlights" not in series.keys():  # Sometimes no highlights are provided
+                continue
+
+            # The Highlights are standarized therefore positional the possibility of positional changes can be negleted
+            multiple_resp[i] = pd.DataFrame(series["Highlights"], index=[0]).values[0]
+
+            num += 1
+            total = len(element)
+            print(f"...Working on it: {num}/{total}")
+
+        # Getting the standardized index of the EOD Highlights
+        index = pd.DataFrame(series["Highlights"], index=[0]).transpose().index
+        data = pd.DataFrame(multiple_resp, index=index)
+        delta = total - num
+
+        print(f"\n{delta} values were not available")
+
+    # Handling the case if data is requested for one stock only
     else:
         series = client.get_fundamental_equity(element)
         resp.append(series)
 
-    data = pd.DataFrame(
-        pd.DataFrame(resp)["Highlights"].iloc[0],
-        index=[0]
-    ).transpose()
+        data = pd.DataFrame(
+            pd.DataFrame(resp)["Highlights"].iloc[0],
+            index= [str(element)]
+        ).transpose()
 
     return data
 
