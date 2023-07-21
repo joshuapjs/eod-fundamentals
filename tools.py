@@ -2,7 +2,6 @@ import os
 import requests
 import matplotlib.pyplot as plt
 import pandas as pd
-import numpy as np
 from eod import EodHistoricalData
 
 # Ticker symbols of companies in the US need to be followed by .US : "AAPL" -> "AAPL.US"
@@ -11,17 +10,18 @@ key = os.environ["API_EOD"]  # gathering the API-Key for EODhistoricaldata, stor
 client = EodHistoricalData(key)  # setting up the client for downloading the fundamental data
 
 
-def get_group(symbol, name=None):
+def get_group(symbol, limit_per_exchange=5):
     """
     Access all relevant stocks within a certain industry, determined by the symbol given
     :param symbol: requires one single ticker symbol as a string
     :type symbol: str
-    :param name: filter the competitors list by the company's name to avoid redundancies  in case of multiple listing
-    :type name: str, optional
+    :param limit_per_exchange: number of stocks to be downloaded per exchange
+    :type limit_per_exchange: int (default: 5)
     :return: list of all stock symbols within the same industry of the most relevant exchanges
     """
     group_symbols = []
     tickers = []
+    company_name = 0
     relevant_exchanges = ['Xetra', 'US', 'LSE', 'HK', 'SHG']  # List of what I found to be the most relevant exchanges
 
     if ".US" in symbol:
@@ -33,7 +33,7 @@ def get_group(symbol, name=None):
         initial_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}&filters=['
                                     f'["code","=","{symbol}"],'
                                     f'["exchange","=","{exchange}"]'
-                                    f']&limit=500&offset=0')
+                                    f']&limit={limit_per_exchange}&offset=0')
 
         if len(initial_resp.json()["data"]) > 0:
             tickers.append(initial_resp.json()["data"][0])
@@ -47,22 +47,30 @@ def get_group(symbol, name=None):
     # Searching for all the stocks within the same industry on all different exchanges
     for exchange in relevant_exchanges:
 
-        market_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}&filters=['
+        market_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}'
+                                   '&sort=market_capitalization.desc&filters=['
                                    f'["industry","=","{stock_industry}"],'
                                    f'["exchange","=","{exchange}"]'
-                                   f']&limit=500&offset=0')
+                                   f']&limit={limit_per_exchange}&offset=0')
 
         if len(market_resp.json()["data"]) > 0:
             if len(market_resp.json()["data"]) > 1:
                 for element in market_resp.json()["data"]:
                     tickers.append((element["code"], element["name"]))
-                tickers.append((market_resp.json()["data"][0]["code"], market_resp.json()["data"][0]["name"]))
+                tickers.append((market_resp.json()["data"][0]["code"],
+                                market_resp.json()["data"][0]["name"]))
+
+    # Gathering the correct company's name and saving the name in the company_name variable
+    for i, t in enumerate(tickers):
+        if t[0] == symbol:
+            company_name = tickers[i][1]
+            print(tickers[i])
 
     # Check to avoid redundancy of the competitors
     for i in tickers:
         if i[0] in group_symbols:
             pass
-        elif name is not None and name in i[1]:
+        elif symbol != i[0] and company_name.split(' ')[0] in i[1]:
             pass
         else:
             group_symbols.append(i[0])
@@ -116,12 +124,12 @@ def get_highlights(element):
             # Excluding stocks where no fundamental data is provided
             try:
                 series = client.get_fundamental_equity(i)
-            except:
-                continue  # Skipping the stock if there is not server response
+            except requests.exceptions.HTTPError:
+                continue  # Skipping the stock if there is no server response
             if "Highlights" not in series.keys():  # Sometimes no highlights are provided
                 continue
 
-            # The Highlights are standarized therefore positional the possibility of positional changes can be negleted
+            # The Highlights are standardised therefore positional the possibility of positional changes can be excluded
             multiple_resp[i] = pd.DataFrame(series["Highlights"], index=[0]).values[0]
 
             num += 1
@@ -142,7 +150,7 @@ def get_highlights(element):
 
         data = pd.DataFrame(
             pd.DataFrame(resp)["Highlights"].iloc[0],
-            index= [str(element)]
+            index=[str(element)]
         ).transpose()
 
     return data
@@ -196,7 +204,7 @@ def compare(equity, group):  # Builds on the group_overview function
     :param equity: Ticker symbol of the stock that ought to be compared
     :type equity: str
     :param group: DataFrame created by the
-    group_overview function with symbols of the competitors you want to derive an avarage of - Including the symbol
+    group_overview function with symbols of the competitors you want to derive an average of - Including the symbol
     of the stock you want to compare to its market
     :type group: pd.DataFrame
 
