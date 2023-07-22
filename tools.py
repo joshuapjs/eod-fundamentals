@@ -2,7 +2,6 @@ import os
 import requests
 import matplotlib.pyplot as plt
 import pandas as pd
-from fuzzywuzzy import fuzz
 from eod import EodHistoricalData
 
 
@@ -57,39 +56,49 @@ def get_group(symbol, limit_per_exchange=5):
                 tickers.append((element["code"], element["name"]))
 
     firms = [firm[1] for firm in tickers]  # List of all company names
+    black_list = set()
 
     # Check to avoid redundancies
-    for i in tickers:
-        answer = "x"  # Default answer
-        black_list = set()  # List of all symbols that shall be excluded
+    for i in tickers:  # Set of all symbols that shall be excluded
         for t in firms:
             # Check if the company name is similar to another company name
             # and if the company name is not in the black list or the group symbols
             # and if the company name is more than once in the list
-            if fuzz.ratio(i[1], t) > 90 and\
-                    i[0] not in (black_list or group_symbols) and\
+            if i[1] == t and\
+                    i[0] not in black_list and i[0] not in group_symbols and\
                     firms.count(i[1]) > 1:
 
                 print("ATTENTION: Some companies sound similar")
-                print(i[1], f"({i[0]})", "and", t)
+
+                filtered_tickers = [ticker for ticker in tickers if ticker != i]
+                other_ticker = [x for x in filtered_tickers if x[1] == t][0]
+
                 print(i[1], f"is {firms.count(i[1])} times in the list")
-                answer = input(f"Should I add {i[1]}? (y/n)\n:")
+                print(i[1], f"({i[0]})", "and", t, f"({other_ticker[0]})", "sound similar")
+
+                answer = input(f"Should I add\n"
+                               f"1) {i[1]} ({i[0]})\n"
+                               f"2) {t} ({other_ticker[0]})\n"
+                               f"3) None ? (1/2/3)\n"
+                               f":")
 
                 # Check if the answer is valid
-                while answer not in ["y", "n"]:
-                    answer = input("Please enter 'y' or 'n':\n:")
+                while answer not in ["1", "2", "3"]:
+                    answer = input("Please enter '1', '2' or '3':\n:")
 
                 # Check if the answer is yes or no
-                if answer == "y":
+                if answer == "1":
                     group_symbols.add(i[0])
+                    black_list.add(other_ticker[0])
                     continue
-                elif answer == "n":
+                elif answer == "2":
                     black_list.add(i[0])
+                    group_symbols.add(other_ticker[0])
                     continue
-
-        if answer == "n":
-            continue
-        group_symbols.add(i[0])
+                elif answer == "3":
+                    black_list.add(i[0])
+                    black_list.add(other_ticker[0])
+        continue
 
     return list(group_symbols)
 
