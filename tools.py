@@ -22,8 +22,7 @@ def get_group(symbol, limit_per_exchange=5):
     """
     group_symbols = set()
     tickers = []
-    company_name = 0
-    relevant_exchanges = ['Xetra', 'US', 'LSE', 'HK', 'SHG']  # List of what I found to be the most relevant exchanges
+    relevant_exchanges = ['Xetra', 'US', 'LSE', 'HK']  # List of what I found to be the most relevant exchanges
 
     if ".US" in symbol:
         symbol = symbol.replace(".US", "")
@@ -41,7 +40,7 @@ def get_group(symbol, limit_per_exchange=5):
 
     # Check if the stock is listed on several Exchanges with the same symbol
     if len(tickers) > 1:
-        print("DANGER: Stock is listed on different exchanges... ")
+        print("ATTENTION: Stock is listed on different exchanges")
     stock_industry = tickers[0]["industry"]
     tickers.clear()
 
@@ -58,35 +57,42 @@ def get_group(symbol, limit_per_exchange=5):
             for element in market_resp.json()["data"]:
                 tickers.append((element["code"], element["name"]))
 
-    # Gathering the correct company's name belonging to the symbol and saving the name in the company_name variable
-    for i, t in enumerate(tickers):
-        if t[0] == symbol:
-            company_name = tickers[i][1]
-
-    firms = [firm[1] for firm in tickers]
+    firms = [firm[1] for firm in tickers]  # List of all company names
 
     # Check to avoid redundancies
     for i in tickers:
-        answer = "y"
-        if symbol != i[0] and company_name.split(' ')[0] in i[1]:
-            pass
+        answer = "x"  # Default answer
+        black_list = set()  # List of all symbols that shall be excluded
         for t in firms:
-            if 100 > fuzz.ratio(i[1], t) > 70:
+            # Check if the company name is similar to another company name
+            # and if the company name is not in the black list or the group symbols
+            # and if the company name is more than once in the list
+            if fuzz.ratio(i[1], t) > 90 and\
+                    i[0] not in (black_list or group_symbols) and\
+                    firms.count(i[1]) > 1:
 
-                print("ATTENTION: Two companies sound similar")
-                print(i[1],f"({i[0]})","and",t)
+                print("ATTENTION: Some companies sound similar")
+                print(i[1], f"({i[0]})", "and", t)
+                print(i[1], f"is {firms.count(i[1])} times in the list")
                 answer = input(f"Should I add {i[1]}? (y/n)\n:")
 
+                # Check if the answer is valid
+                while answer not in ["y", "n"]:
+                    answer = input("Please enter 'y' or 'n':\n:")
+
+                # Check if the answer is yes or no
                 if answer == "y":
                     group_symbols.add(i[0])
-                else:
+                    continue
+                elif answer == "n":
+                    black_list.add(i[0])
                     continue
 
         if answer == "n":
             continue
         group_symbols.add(i[0])
 
-    return group_symbols
+    return list(group_symbols)
 
 
 def get_statement(element, statement_type="Balance_Sheet"):
@@ -257,5 +263,3 @@ def plot_position(statement_position, statement):
     current_values = plt.gca().get_yticks()
     plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
     plt.show()
-
-print(get_group('AAPL', limit_per_exchange=2))
