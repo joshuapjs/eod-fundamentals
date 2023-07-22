@@ -2,6 +2,7 @@ import os
 import requests
 import matplotlib.pyplot as plt
 import pandas as pd
+from fuzzywuzzy import fuzz
 from eod import EodHistoricalData
 
 # Ticker symbols of companies in the US need to be followed by .US : "AAPL" -> "AAPL.US"
@@ -19,7 +20,7 @@ def get_group(symbol, limit_per_exchange=5):
     :type limit_per_exchange: int (default: 5)
     :return: list of all stock symbols within the same industry of the most relevant exchanges
     """
-    group_symbols = []
+    group_symbols = set()
     tickers = []
     company_name = 0
     relevant_exchanges = ['Xetra', 'US', 'LSE', 'HK', 'SHG']  # List of what I found to be the most relevant exchanges
@@ -53,27 +54,37 @@ def get_group(symbol, limit_per_exchange=5):
                                    f'["exchange","=","{exchange}"]'
                                    f']&limit={limit_per_exchange}&offset=0')
 
-        if len(market_resp.json()["data"]) > 0:
-            if len(market_resp.json()["data"]) > 1:
-                for element in market_resp.json()["data"]:
-                    tickers.append((element["code"], element["name"]))
-                tickers.append((market_resp.json()["data"][0]["code"],
-                                market_resp.json()["data"][0]["name"]))
+        if len(market_resp.json()["data"]) > 1:
+            for element in market_resp.json()["data"]:
+                tickers.append((element["code"], element["name"]))
 
-    # Gathering the correct company's name and saving the name in the company_name variable
+    # Gathering the correct company's name belonging to the symbol and saving the name in the company_name variable
     for i, t in enumerate(tickers):
         if t[0] == symbol:
             company_name = tickers[i][1]
-            print(tickers[i])
 
-    # Check to avoid redundancy of the competitors
+    firms = [firm[1] for firm in tickers]
+
+    # Check to avoid redundancies
     for i in tickers:
-        if i[0] in group_symbols:
+        answer = "y"
+        if symbol != i[0] and company_name.split(' ')[0] in i[1]:
             pass
-        elif symbol != i[0] and company_name.split(' ')[0] in i[1]:
-            pass
-        else:
-            group_symbols.append(i[0])
+        for t in firms:
+            if 100 > fuzz.ratio(i[1], t) > 70:
+
+                print("ATTENTION: Two companies sound similar")
+                print(i[1],f"({i[0]})","and",t)
+                answer = input(f"Should I add {i[1]}? (y/n)\n:")
+
+                if answer == "y":
+                    group_symbols.add(i[0])
+                else:
+                    continue
+
+        if answer == "n":
+            continue
+        group_symbols.add(i[0])
 
     return group_symbols
 
@@ -246,3 +257,5 @@ def plot_position(statement_position, statement):
     current_values = plt.gca().get_yticks()
     plt.gca().set_yticklabels(['{:,.0f}'.format(x) for x in current_values])
     plt.show()
+
+print(get_group('AAPL', limit_per_exchange=2))
