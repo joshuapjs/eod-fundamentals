@@ -5,7 +5,6 @@ import pandas as pd
 from fuzzywuzzy import fuzz
 from eod import EodHistoricalData
 
-# Ticker symbols of companies in the US need to be followed by .US : "AAPL" -> "AAPL.US"
 
 key = os.environ["API_EOD"]  # gathering the API-Key for EODhistoricaldata, stored in an environment variable
 client = EodHistoricalData(key)  # setting up the client for downloading the fundamental data
