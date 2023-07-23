@@ -142,6 +142,7 @@ def get_highlights(element):
     resp = []
     multiple_resp = {}
     num = 0
+    biggest_index = [0]
 
     # Check if data is requested for several stocks all at once
     if isinstance(element, list):
@@ -151,19 +152,24 @@ def get_highlights(element):
                 series = client.get_fundamental_equity(i)
             except requests.exceptions.HTTPError:
                 continue  # Skipping the stock if there is no server response
-            if "Highlights" not in series.keys():  # Sometimes no highlights are provided
+            if "Highlights" not in series.keys():  # Sometimes no Highlights are provided
                 continue
 
+            # transforming the data of the series variable into a DataFrame
+            frame = pd.DataFrame(series["Highlights"], index=[str(i)])
+
+            # Check if the index is bigger than the biggest index
+            if len(frame.transpose().index) > len(biggest_index):
+                biggest_index = frame.transpose().index
+
             # The Highlights are standardised therefore positional the possibility of positional changes can be excluded
-            multiple_resp[i] = pd.DataFrame(series["Highlights"], index=[0]).values[0]
+            multiple_resp[i] = frame.transpose()
 
             num += 1
             total = len(element)
             print(f"...Working on it: {num}/{total}")
 
-        # Getting the standardized index of the EOD Highlights
-        index = pd.DataFrame(series["Highlights"], index=[0]).transpose().index
-        data = pd.DataFrame(multiple_resp, index=index)
+        data = pd.concat(multiple_resp.values(), axis=1)
         delta = total - num
 
         print(f"\n{delta} values were not available")
