@@ -38,7 +38,8 @@ def get_group(symbol, limit_per_exchange=5):
 
     # Check if the stock is listed on several Exchanges with the same symbol
     if len(tickers) > 1:
-        print("ATTENTION: Stock is listed on different exchanges")
+        print("ATTENTION: Stock is listed on different exchanges. "
+              "First one is taken as the basis for the industry.")
     stock_industry = tickers[0]["industry"]
     tickers.clear()
 
@@ -187,77 +188,21 @@ def get_highlights(element):
     return data
 
 
-def group_overview(elements):
-    """
-    The highlights can be adjusted for a list of the highlights visit:
-    https://eodhistoricaldata.com/financial-apis/stock-etfs-fundamental-data-feeds/#Equities_Fundamentals_Data_API
+def group_overview(equity_ticker, group_ticker):
 
-    :param elements: ticker symbol or multiple symbol of the company
-    :type elements: str, list
-    :return: DataFrame providing an overview about different KPIs for all stock tickers given as "elements"
-    """
-    kpis = {}
+    if ".US" in equity_ticker:
+        equity_ticker = equity_ticker.replace(".US", "")
 
-    if isinstance(elements, list):
-        formatted_elements = elements
-        pass
-    else:
-        formatted_elements = list(elements)
+    # Getting the Highlights of the group
+    highlights = get_highlights(group_ticker)
+    highlights_filter = highlights[highlights.columns].applymap(lambda x: isinstance(x, (float, int))).all(axis=1)
+    cleaned_highlights = highlights[highlights_filter]  # Cleaning the DataFrame
 
-    for element in formatted_elements:
-        highlights = get_highlights(element)
-        kpis[str(element)] = [
-            highlights["EarningsShare"].iloc[0],
-            highlights["EPSEstimateCurrentYear"].iloc[0],
-            highlights["ProfitMargin"].iloc[0],
-            highlights["OperatingMarginTTM"].iloc[0],
-            highlights["ReturnOnAssetsTTM"].iloc[0],
-            highlights["QuarterlyRevenueGrowthYOY"].iloc[0],
-            highlights["QuarterlyEarningsGrowthYOY"].iloc[0]]
-    df = pd.DataFrame(kpis, index=["EPS",
-                                   "EPS (current year)",
-                                   "Profit margin",
-                                   "Operating margin (trailing 12-month)",
-                                   "ROA (trailing 12-month)",
-                                   "Quarterly revenue growth (YoY)",
-                                   "Quarterly earnings growth (YoY)"])
+    # Calculating the average of the group
+    cleaned_highlights["Average"] = cleaned_highlights.drop(columns=[equity_ticker]).mean(axis=1)
+    output_df = cleaned_highlights[[equity_ticker, "Average"]]
 
-    return df
-
-
-def compare(equity, group):  # Builds on the group_overview function
-    """
-    Example::
-
-        df = group_overview(["BCOR.US", "BSIG.US", "RILY.US", "VRTS.US", "WETF.US"])  # DataFrame of a group
-        df1 = compare("BCOR.US",df)  # Comparing KPIs of the stock with the averages of its group
-
-    :param equity: Ticker symbol of the stock that ought to be compared
-    :type equity: str
-    :param group: DataFrame created by the
-    group_overview function with symbols of the competitors you want to derive an average of - Including the symbol
-    of the stock you want to compare to its market
-    :type group: pd.DataFrame
-
-    :return: DataFrame containing different KPIs of one stock and the average of its group given as a separate list
-    """
-    index = group.index
-    data = {}
-    averages = []
-    for row in index:
-        average = group.loc[row].mean()
-        averages.append(average)
-    data[str(equity)] = group[equity]
-    data["Market"] = averages
-    df = pd.DataFrame(data, index=["EPS",
-                                   "EPS (current year)",
-                                   "Profit margin",
-                                   "Operating margin (Trailing 12-month)",
-                                   "ROA (Trailing 12-month)",
-                                   "Quarterly revenue growth (YoY)",
-                                   "Quarterly earnings growth (YoY)"])
-
-    return df
+    return output_df
 
 
 def plot_position(statement_position, statement):
