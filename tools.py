@@ -9,41 +9,41 @@ key = os.environ["API_EOD"]  # gathering the API-Key for EODhistoricaldata, stor
 client = EodHistoricalData(key)  # setting up the client for downloading the fundamental data
 
 
-def get_group(symbol, limit_per_exchange=5):
+def get_market(ticker, limit_per_exchange=5):
     """
     Access all relevant stocks within a certain industry, determined by the symbol given
-    :param symbol: requires one single ticker symbol as a string
-    :type symbol: str
+    :param ticker: requires one single ticker symbol as a string
+    :type ticker: str
     :param limit_per_exchange: number of stocks to be downloaded per exchange
     :type limit_per_exchange: int (default: 5)
     :return: list of all stock symbols within the same industry of the most relevant exchanges
     """
-    group_symbols = set()
-    tickers = []
+    relevant_tickers = set()
+    response_list = []  # List is used for two purposes (1) to save the industry (2) to save the stocks
     relevant_exchanges = ['Xetra', 'US', 'LSE', 'HK']  # List of what I found to be the most relevant exchanges
 
-    if ".US" in symbol:
-        symbol = symbol.replace(".US", "")
+    if ".US" in ticker:
+        ticker = ticker.replace(".US", "")
 
     # Searching the stock symbol on the most relevant exchanges
     for exchange in relevant_exchanges:
 
         initial_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}&filters=['
-                                    f'["code","=","{symbol}"],'
+                                    f'["code","=","{ticker}"],'
                                     f'["exchange","=","{exchange}"]'
                                     f']&limit={limit_per_exchange}&offset=0')
 
         if len(initial_resp.json()["data"]) > 0:
-            tickers.append(initial_resp.json()["data"][0])
+            response_list.append(initial_resp.json()["data"][0])
 
     # Check if the stock is listed on several Exchanges with the same symbol
-    if len(tickers) > 1:
+    if len(response_list) > 1:
         print("ATTENTION: Stock is listed on different exchanges. "
               "First one is taken as the basis for the industry.")
-    stock_industry = tickers[0]["industry"]
-    tickers.clear()
+    stock_industry = response_list[0]["industry"]
+    response_list.clear()
 
-    # Searching for all the stocks within the same industry on all different exchanges
+    # Searching for all the stock tickers within the same industry on all different exchanges
     for exchange in relevant_exchanges:
 
         market_resp = requests.get(f'https://eodhistoricaldata.com/api/screener?api_token={key}'
@@ -54,24 +54,24 @@ def get_group(symbol, limit_per_exchange=5):
 
         if len(market_resp.json()["data"]) > 1:
             for element in market_resp.json()["data"]:
-                tickers.append((element["code"], element["name"]))
+                response_list.append((element["code"], element["name"]))
 
-    firms = [firm[1] for firm in tickers]  # List of all company names
+    firms = [firm[1] for firm in response_list]  # List of all company names
     black_list = set()
 
     # Check to avoid redundancies
-    for i in tickers:  # Set of all symbols that shall be excluded
+    for i in response_list:  # List of all symbols that shall be excluded
         for t in firms:
             # Check if the company name is similar to another company name
-            # and if the company name is not in the black list or the group symbols
+            # and if the company name is not in the black list or part of the relevant tickers
             # and if the company name is more than once in the list
             if i[1] == t and\
-                    i[0] not in black_list and i[0] not in group_symbols and\
+                    i[0] not in black_list and i[0] not in relevant_tickers and\
                     firms.count(i[1]) > 1:
 
                 print("ATTENTION: Some companies sound similar")
 
-                filtered_tickers = [ticker for ticker in tickers if ticker != i]
+                filtered_tickers = [ticker for ticker in response_list if ticker != i]
                 other_ticker = [x for x in filtered_tickers if x[1] == t][0]
 
                 print(i[1], f"is {firms.count(i[1])} times in the list")
@@ -89,19 +89,19 @@ def get_group(symbol, limit_per_exchange=5):
 
                 # Check if the answer is yes or no
                 if answer == "1":
-                    group_symbols.add(i[0])
+                    relevant_tickers.add(i[0])
                     black_list.add(other_ticker[0])
                     continue
                 elif answer == "2":
                     black_list.add(i[0])
-                    group_symbols.add(other_ticker[0])
+                    relevant_tickers.add(other_ticker[0])
                     continue
                 elif answer == "3":
                     black_list.add(i[0])
                     black_list.add(other_ticker[0])
         continue
 
-    return list(group_symbols)
+    return list(relevant_tickers)
 
 
 def get_statement(element, statement_type="Balance_Sheet"):
@@ -188,19 +188,19 @@ def get_highlights(element):
     return data
 
 
-def group_overview(equity_ticker, group_ticker):
+def kpi_analysis(ticker, market_tickers):
 
-    if ".US" in equity_ticker:
-        equity_ticker = equity_ticker.replace(".US", "")
+    if ".US" in ticker:
+        ticker = ticker.replace(".US", "")
 
-    # Getting the Highlights of the group
-    highlights = get_highlights(group_ticker)
+    # Getting the Highlights of the market and the equity
+    highlights = get_highlights(market_tickers)
     highlights_filter = highlights[highlights.columns].applymap(lambda x: isinstance(x, (float, int))).all(axis=1)
     cleaned_highlights = highlights[highlights_filter]  # Cleaning the DataFrame
 
-    # Calculating the average of the group
-    cleaned_highlights["Average"] = cleaned_highlights.drop(columns=[equity_ticker]).mean(axis=1)
-    output_df = cleaned_highlights[[equity_ticker, "Average"]]
+    # Calculating the average of the market
+    cleaned_highlights["Average"] = cleaned_highlights.drop(columns=[ticker]).mean(axis=1)
+    output_df = cleaned_highlights[[ticker, "Average"]]
 
     return output_df
 
