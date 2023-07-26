@@ -193,14 +193,28 @@ def kpi_analysis(ticker, market_tickers):
     if ".US" in ticker:
         ticker = ticker.replace(".US", "")
 
-    # Getting the Highlights of the market and the equity
-    highlights = get_highlights(market_tickers)
+    if len(market_tickers) > 1:
+        column_name = "Market Average"
+    else:
+        column_name = market_tickers[0]
+
+    # Getting the highlights of the stock and the market
+    if len(market_tickers) > 1 and ticker in market_tickers:
+        highlights = get_highlights(market_tickers)
+    elif len(market_tickers) > 1 and ticker not in market_tickers:
+        highlights = get_highlights([ticker, *market_tickers])
+    else:
+        highlights = get_highlights([ticker, market_tickers[0]])
+
     highlights_filter = highlights[highlights.columns].applymap(lambda x: isinstance(x, (float, int))).all(axis=1)
     cleaned_highlights = highlights[highlights_filter]  # Cleaning the DataFrame
 
     # Calculating the average of the market
-    cleaned_highlights["Average"] = cleaned_highlights.drop(columns=[ticker]).mean(axis=1)
-    output_df = cleaned_highlights[[ticker, "Average"]]
+    if len(market_tickers) > 1:
+        cleaned_highlights[column_name] = cleaned_highlights.drop(columns=[ticker]).mean(axis=1)
+
+    pd.options.display.float_format = '{:,.2f}'.format  # Setting the format of the output
+    output_df = cleaned_highlights[[ticker, column_name]].convert_dtypes(convert_floating=True)
 
     return output_df
 
