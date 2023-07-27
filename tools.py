@@ -188,7 +188,7 @@ def get_highlights(element):
     return data
 
 
-def kpi_analysis(ticker, market_tickers):
+def analysis(ticker, market_tickers):
 
     if ".US" in ticker:
         ticker = ticker.replace(".US", "")
