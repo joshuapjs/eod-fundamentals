@@ -20,9 +20,9 @@ Set your EODhistoricaldata API key in an environment variable named `API_EOD`.
 
 ## Features
 
-1. **get_market**: Given a stock ticker, it identifies all relevant stocks within the same industry.
+1. **get_market**: Given a stock ticker, it identifies all relevant stocks within the same industry. User input might be required.
 2. **get_statement**: Fetches financial statements such as Balance Sheet, Income Statement, or Cash Flow for the provided stock ticker(s).
-3. **get_highlights**: Provides key financial metrics for the specified stock ticker(s).
+3. **get_highlights**: Provides key financial metrics for the specified stock ticker(s) aggregated in the "Highlights" of the fundamentals data.
 4. **analysis**: Performs analysis by comparing the given ticker's key financial metrics with the market average or another specific ticker.
 5. **plot_position**: Visualizes the historical trend of a specific financial metric.
 
@@ -55,7 +55,7 @@ print(output)
 ### Visualize the developement of a Statement position
 ```python
 statement = get_statement("AAPL.US", statement_type="Balance_Sheet")
-plot_position("Total Current Assets", statement)
+plot_position("totalAssets", statement)
 ```
 
 ## Notes
